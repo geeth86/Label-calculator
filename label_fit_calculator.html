@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Label Fit Calculator</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background-color: #f9f9f9;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-width: 100%;
+    }
+    label {
+      display: flex;
+      flex-direction: column;
+      font-size: 16px;
+    }
+    input, select, button {
+      padding: 10px;
+      font-size: 16px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    canvas {
+      width: 100%;
+      height: auto;
+      border: 1px solid #ccc;
+      margin-top: 20px;
+    }
+    .result {
+      margin-top: 15px;
+      font-weight: bold;
+    }
+    .button-row {
+      display: flex;
+      gap: 10px;
+      flex-direction: row;
+    }
+    @media (min-width: 600px) {
+      .container {
+        max-width: 600px;
+        margin: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h2>Label Fit Calculator</h2>
+  <div class="container">
+    <label>Unit:
+      <select id="unit" onchange="updateUnit()">
+        <option value="mm">Millimeters (mm)</option>
+        <option value="cm">Centimeters (cm)</option>
+        <option value="in">Inches (in)</option>
+      </select>
+    </label>
+
+    <label>Predefined Sheet Size:
+      <select id="sheetSize" onchange="setPredefinedSheet()">
+        <option value="">-- Select --</option>
+        <option value="A5">A5 (148 x 210 mm)</option>
+        <option value="A4">A4 (210 x 297 mm)</option>
+        <option value="A3">A3 (297 x 420 mm)</option>
+        <option value="B2">B2 (500 x 707 mm)</option>
+        <option value="12.5x19">12.5 × 19 in</option>
+        <option value="12x18">12 × 18 in</option>
+        <option value="13x19">13 × 19 in</option>
+        <option value="20x25">20 × 25 in</option>
+        <option value="20x29">20 × 29 in</option>
+      </select>
+    </label>
+
+    <label>Sheet Width: <input type="number" id="sheetWidth" value="210"></label>
+    <label>Sheet Height: <input type="number" id="sheetHeight" value="297"></label>
+    <label>Label Width: <input type="number" id="labelWidth" value="50"></label>
+    <label>Label Height: <input type="number" id="labelHeight" value="30"></label>
+
+    <div class="button-row">
+      <button onclick="calculateLabels()">Calculate</button>
+      <button onclick="resetForm()">Reset</button>
+    </div>
+
+    <div class="result" id="resultText"></div>
+    <canvas id="preview"></canvas>
+  </div>
+
+  <script>
+    const unitFactors = {
+      mm: 1,
+      cm: 10,
+      in: 25.4
+    };
+
+    function getConversionFactor() {
+      const unit = document.getElementById("unit").value;
+      return unitFactors[unit] || 1;
+    }
+
+    function updateUnit() {
+      calculateLabels();
+    }
+
+    function setPredefinedSheet() {
+      const size = document.getElementById("sheetSize").value;
+      let width = 0, height = 0;
+      switch(size) {
+        case "A5": width = 148; height = 210; break;
+        case "A4": width = 210; height = 297; break;
+        case "A3": width = 297; height = 420; break;
+        case "B2": width = 500; height = 707; break;
+        case "12.5x19": width = 12.5 * 25.4; height = 19 * 25.4; break;
+        case "12x18": width = 12 * 25.4; height = 18 * 25.4; break;
+        case "13x19": width = 13 * 25.4; height = 19 * 25.4; break;
+        case "20x25": width = 20 * 25.4; height = 25 * 25.4; break;
+        case "20x29": width = 20 * 25.4; height = 29 * 25.4; break;
+      }
+      const factor = getConversionFactor();
+      document.getElementById("sheetWidth").value = (width / factor).toFixed(2);
+      document.getElementById("sheetHeight").value = (height / factor).toFixed(2);
+    }
+
+    function calculateLabels() {
+      const canvas = document.getElementById("preview");
+      canvas.width = canvas.clientWidth;
+      canvas.height = canvas.clientWidth * 1.33;
+
+      const factor = getConversionFactor();
+      const sheetWidth = parseFloat(document.getElementById("sheetWidth").value) * factor;
+      const sheetHeight = parseFloat(document.getElementById("sheetHeight").value) * factor;
+      const labelWidth = parseFloat(document.getElementById("labelWidth").value) * factor;
+      const labelHeight = parseFloat(document.getElementById("labelHeight").value) * factor;
+
+      const cols = Math.floor(sheetWidth / labelWidth);
+      const rows = Math.floor(sheetHeight / labelHeight);
+      const total = cols * rows;
+
+      document.getElementById("resultText").textContent = `You can fit ${cols} columns × ${rows} rows = ${total} labels per sheet.`;
+
+      drawLayout(sheetWidth, sheetHeight, labelWidth, labelHeight, cols, rows);
+    }
+
+    function drawLayout(sheetW, sheetH, labelW, labelH, cols, rows) {
+      const canvas = document.getElementById("preview");
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const scale = Math.min(canvas.width / sheetW, canvas.height / sheetH);
+      const offsetX = (canvas.width - sheetW * scale) / 2;
+      const offsetY = (canvas.height - sheetH * scale) / 2;
+
+      ctx.fillStyle = "#f0f0f0";
+      ctx.fillRect(offsetX, offsetY, sheetW * scale, sheetH * scale);
+      ctx.strokeStyle = "#000";
+      ctx.strokeRect(offsetX, offsetY, sheetW * scale, sheetH * scale);
+
+      const usedW = labelW * cols;
+      const usedH = labelH * rows;
+      const offcutW = sheetW - usedW;
+      const offcutH = sheetH - usedH;
+
+      ctx.fillStyle = "rgba(255, 0, 0, 0.1)";
+      if (offcutW > 0) ctx.fillRect(offsetX + usedW * scale, offsetY, offcutW * scale, sheetH * scale);
+      if (offcutH > 0) ctx.fillRect(offsetX, offsetY + usedH * scale, usedW * scale, offcutH * scale);
+      if (offcutW > 0 && offcutH > 0) ctx.fillRect(offsetX + usedW * scale, offsetY + usedH * scale, offcutW * scale, offcutH * scale);
+
+      ctx.strokeStyle = "#007bff";
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const x = offsetX + c * labelW * scale;
+          const y = offsetY + r * labelH * scale;
+          ctx.strokeRect(x, y, labelW * scale, labelH * scale);
+        }
+      }
+    }
+
+    function resetForm() {
+      document.getElementById("unit").value = "mm";
+      document.getElementById("sheetSize").value = "";
+      document.getElementById("sheetWidth").value = 210;
+      document.getElementById("sheetHeight").value = 297;
+      document.getElementById("labelWidth").value = 50;
+      document.getElementById("labelHeight").value = 30;
+      document.getElementById("resultText").textContent = "";
+      const canvas = document.getElementById("preview");
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+  </script>
+</body>
+</html>
